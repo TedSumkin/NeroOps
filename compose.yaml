@@ -1,0 +1,12 @@
+services:
+  neroops:
+    build: .
+    restart: unless-stopped
+    environment:
+      NEROOPS_DATA_DIR: /data
+      NEROOPS_TIMEZONE: Europe/Moscow
+    volumes:
+      - ./data:/data
+    ports:
+      - "127.0.0.1:8000:8000"
+
