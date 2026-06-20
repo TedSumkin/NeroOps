@@ -13,6 +13,23 @@ def build_summary(
     to_date: date,
     timezone_name: str = "Europe/Moscow",
 ) -> SummaryResponse:
+    """Build an aggregate report for already selected diary entries.
+
+    The function is intentionally independent from FastAPI and SQLAlchemy
+    queries: callers are responsible for selecting the pet and filtering entries
+    to the requested period before calling it.
+
+    Args:
+        entries: Entries to aggregate. Their ``occurred_at`` values should be
+            timezone-aware datetimes.
+        from_date: Inclusive report start date shown in the response.
+        to_date: Inclusive report end date shown in the response.
+        timezone_name: IANA timezone name used to group entries by local day.
+
+    Returns:
+        ``SummaryResponse`` with entry counts by type, symptom episode counts,
+        average score fields, weight history, and per-day entry counts.
+    """
     counts_by_type = Counter(entry.type.value for entry in entries)
     symptom_counts: Counter[str] = Counter()
     score_values: dict[str, list[float]] = defaultdict(list)

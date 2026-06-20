@@ -120,6 +120,7 @@ backend/neroops/
   api.py                HTTP API и файловые операции
   schemas.py            Pydantic-модели и проверка payload
   models.py             SQLAlchemy-модели
+  services/README.md    подробная документация сервисного слоя
   services/reports.py   чистая Python-аналитика
 frontend/src/
   App.tsx               экраны и формы PWA
