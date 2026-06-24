@@ -166,7 +166,7 @@ def symptom_frequency(
     entries: Sequence[Entry],
     from_date: date,
     to_date: date,
-    timezone_name: str = "Europe/Moscow",
+    timezone_name: timezone | ZoneInfo | str = "Europe/Moscow",
 ) -> dict[str, float]:
     ...
 ```
@@ -323,4 +323,3 @@ FoodSymptomAssociation(
 
 Публичный JSON строится из Pydantic-моделей без ручного формирования словарей в
 endpoint.
-

@@ -49,6 +49,7 @@ class SymptomPayload(StrictPayload):
         "skin",
         "breathing",
         "other",
+        "ears",
     ]
     severity: Score
     count: Annotated[int, Field(ge=1, le=100)] = 1
@@ -220,3 +221,16 @@ class SummaryResponse(BaseModel):
     average_scores: dict[str, float]
     weight_series: list[dict[str, str | float]]
     daily_counts: list[DailyCount]
+
+
+class HealthPeriodMetrics(BaseModel):
+    from_date: date
+    to_date: date
+    period_days: int = Field(ge=1)
+    symptom_free_days: int = Field(ge=0)
+    symptom_free_day_share: float = Field(ge=0, le=1)
+    symptom_days: int = Field(ge=0)
+    total_symptom_episodes: int = Field(ge=0)
+    symptom_episodes_per_7_days: float = Field(ge=0)
+    symptom_counts: dict[str, int]
+    average_scores: dict[str, float]
