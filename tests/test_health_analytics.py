@@ -787,12 +787,6 @@ def test_symptom_frequency_does_not_round(entrylist_and_datetimes):
     assert expected_result == output, "Symptom_frequency probably rounds values"
 
 
-def test_symptom_frequency_summs_couts_before_converting_to_frequencies(
-    entrylist_and_datetimes,
-):
-    pass
-
-
 def test_symptom_frequency_uses_default_count_1(dates_essentials):
     """test if symptom_frequency falls back to count 1 by default if 'count' is not specified"""
     year, month, tz = dates_essentials
@@ -807,7 +801,7 @@ def test_symptom_frequency_uses_default_count_1(dates_essentials):
         ),
     ]
     expected_result = {"vomitting": 1}
-    assert expected_result == symptom_count(entries, from_date, to_date, tz)
+    assert expected_result == symptom_frequency(entries, from_date, to_date, tz)
     return
 
 
@@ -822,7 +816,7 @@ def test_symptom_frequency_handles_missing_category(dates_essentials):
             payload={"count": 1},
         )
     ]
-    output = symptom_count(entries, from_date, to_date, tz)
+    output = symptom_frequency(entries, from_date, to_date, tz)
     assert output == {
         "other": 1
     }, "symptom_count: missing category does not fall back to 'other'"
@@ -838,7 +832,7 @@ def test_symptom_frequency_ignores_entries_outside_range_with_example(
     to_day = date(year, month, 1)
 
     output = symptom_frequency(entries, from_day, to_day, tz)
-    expected_output = {"vomitting": 14}
+    expected_output = {"vomitting": 14}  # 2 / 1 * 7 == 14
 
     assert output == expected_output, (
         "symptom_frequency ignores symptom entries outside specified date range,"
@@ -864,13 +858,74 @@ def test_symptom_frequency_ignores_zero_counts(dates_essentials):
 
 
 def test_symptom_frequency_handles_naive_datetimes(dates_essentials):
-    year, month, day = dates_essentials
-    pass
+    year, month, tz = dates_essentials
+    from_date = date(year, month, 1)
+    to_date = date(year, month, 10)
+    entries = [
+        make_entry(
+            EntryType.symptom,
+            datetime(year, month, 1, 1),
+            payload={"category": "cough", "count": 1},
+        )
+    ]
+    with pytest.raises(ValueError):
+        count_symptom_free_days(entries, from_date, to_date, tz)
 
 
-# TODO: implement count_state_statistics tests
+def test_symptom_frequency_handles_invalid_date_range(dates_essentials):
+    year, month, tz = dates_essentials
 
-# Test state_statistic
+    from_date = date(year, month, 5)
+    to_date = date(year, month, 1)
+    entries = [
+        make_entry(
+            EntryType.symptom,
+            datetime(year, month, from_date.day, 1, tzinfo=tz),
+            payload={"category": "vomitting", "count": 1},
+        )
+    ]
+
+    with pytest.raises(ValueError):
+        symptom_frequency(entries, from_date, to_date, tz)
+
+
+def test_symptom_frequency_tz_shift_aware(dates_essentials):
+    year, month, tz = dates_essentials
+
+    from_date = date(year, month, 2)
+    to_date = date(year, month, 8)
+    utc_tz = ZoneInfo("UTC")
+
+    entries = [
+        make_entry(
+            EntryType.symptom,
+            datetime(year, month, from_date.day - 1, 21, 30, tzinfo=utc_tz),
+            payload={"category": "cough", "count": 1},
+        )
+    ]
+    expected_result = {"cough": 1}
+    output = symptom_frequency(entries, from_date, to_date, tz)
+
+    assert (
+        expected_result == output
+    ), "symptom_frequency incorrectly handles timezone shift"
+
+
+def test_symptom_frequency_uses_count(dates_essentials):
+    year, month, tz = dates_essentials
+    from_date = date(year, month, 1)
+    to_date = date(year, month, 7)
+    entries = [
+        make_entry(
+            EntryType.symptom,
+            datetime(year, month, from_date.day, 1, tzinfo=tz),
+            payload={"category": "cough", "count": 5},
+        )
+    ]
+    expected_result = {"cough": 5}
+    assert (
+        symptom_frequency(entries, from_date, to_date, tz) == expected_result
+    ), "symptom_frequency incorrectly uses symptom payload counts or does not use them"
 
 
 def test_state_statitstics_ignores_entries_outside_period(dates_essentials):
