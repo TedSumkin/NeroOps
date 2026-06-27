@@ -81,7 +81,7 @@ class HealthPeriodMetrics(BaseModel):
 - `symptom_free_day_share = symptom_free_days / period_days`;
 - `symptom_episodes_per_7_days = total_symptom_episodes / period_days * 7`;
 - `average_scores` использует ключи `appetite`, `energy`, `mood`, `sleep`,
-  `pain`, `quality`, `engagement`;
+  `pain`, `walk_quality`, `engagement`;
 - ключ отсутствует, если за период не было ни одного значения;
 - среднее не округляется внутри функции.
 
