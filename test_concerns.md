@@ -126,17 +126,17 @@ The started test is unfinished:
 
 Needed tests:
 
-- empty input;
-- only `EntryType.walk`, `EntryType.feeding`, `EntryType.wellbeing`, and
+- [ ] empty input;
+- [ ] only `EntryType.walk`, `EntryType.feeding`, `EntryType.wellbeing`, and
   `EntryType.training` are included;
-- entries outside the inclusive period are ignored;
-- multiple entries on one day are handled correctly;
-- statistics are not rounded;
-- timezone boundary near midnight;
-- naive datetime raises `ValueError`;
-- invalid date range raises `ValueError`;
-- bool values are not treated as numeric scores;
-- the function is deterministic and does not mutate inputs.
+- [ ]  entries outside the inclusive period are ignored;
+- [ ]  multiple entries on one day are handled correctly;
+- [ ]  statistics are not rounded;
+- [ ]  timezone boundary near midnight;
+- [ ]  naive datetime raises `ValueError`;
+- [ ]  invalid date range raises `ValueError`;
+- [ ]  bool values are not treated as numeric scores;
+- [ ]  the function is deterministic and does not mutate inputs.
 
 ## `build_health_period_metrics`
 

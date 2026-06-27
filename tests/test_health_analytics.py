@@ -964,3 +964,9 @@ def test_state_statitstics_ignores_entries_outside_period(dates_essentials):
             },
         ),
     ]
+
+
+def test_count_symptom_free_days_handles_empty_entry_lists(dates_essentials):
+    year, month, tz = dates_essentials
+    from_date = date(year, month, 1)
+    to_date = date(year, month, 7)
