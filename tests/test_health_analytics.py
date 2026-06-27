@@ -7,15 +7,14 @@ from zoneinfo import ZoneInfo
 import pytest
 from neroops.models import Entry, EntryType
 from neroops.services.health_analytics import (
+    count_state_statistics,
     count_symptom_free_days,
     symptom_count,
     symptom_frequency,
 )
 
 
-def make_entry(
-    entry_type: EntryType, occurred_at: datetime, payload: dict | None = None
-):
+def make_entry(entry_type: EntryType, occurred_at: datetime, payload: dict | None = None):
     return Entry(
         id=f"{entry_type.value}-{occurred_at.isoformat()}",
         pet_id="pet-id",
@@ -109,6 +108,17 @@ def entrylist_and_datetimes() -> tuple[int, int, ZoneInfo, list[EntryType]]:
     return (year, month, zone_info, entries)
 
 
+@pytest.fixture()
+def empty_entry_list_fixture():
+    year = 2026
+    month = 1
+    from_date = (year, month, 1)
+    to_date = (year, month, 7)
+    zone_info = ZoneInfo("Europe/Moscow")
+    entries = []
+    return (year, month, from_date, to_date, zone_info, entries)
+
+
 def test_count_symptom_free_days_deterministic(entrylist_and_datetimes):
     year, month, tz, entries = entrylist_and_datetimes
     from_date = date(year, month, 1)
@@ -117,9 +127,9 @@ def test_count_symptom_free_days_deterministic(entrylist_and_datetimes):
     output_1 = count_symptom_free_days(entries, from_date, to_date, tz)
     output_2 = count_symptom_free_days(entries, from_date, to_date, tz)
 
-    assert (
-        output_1 == output_2
-    ), "count_symptom_free_days is nondeterministic, different runs yield different results"
+    assert output_1 == output_2, (
+        "count_symptom_free_days is nondeterministic, different runs yield different results"
+    )
 
 
 def test_count_symptom_free_days_handles_empty_entry_lists(dates_essentials):
@@ -162,12 +172,12 @@ def test_count_symptom_free_days_handles_multiple_entries_in_one_day(dates_essen
     output_2nd = count_symptom_free_days(entry_list_2nd, from_date, to_date, tz)
     expected_days = (to_date - from_date).days
 
-    assert (
-        output == expected_days
-    ), "Incorrect handling of two symptom entries in one day in count_symptom_free_days"
-    assert (
-        output_2nd == expected_days
-    ), "Incorrect handling of three symptom entries in one day count_symptom_free_days"
+    assert output == expected_days, (
+        "Incorrect handling of two symptom entries in one day in count_symptom_free_days"
+    )
+    assert output_2nd == expected_days, (
+        "Incorrect handling of three symptom entries in one day count_symptom_free_days"
+    )
 
 
 def test_count_symptom_free_days_ignores_entries_outside_period(dates_essentials):
@@ -178,9 +188,7 @@ def test_count_symptom_free_days_ignores_entries_outside_period(dates_essentials
     from_date = date(year=year, month=month, day=2)
     to_date = date(year=year, month=month, day=7)
     entry_list = [
-        make_entry(
-            EntryType.symptom, datetime(year=year, month=month, day=day, tzinfo=tz)
-        )
+        make_entry(EntryType.symptom, datetime(year=year, month=month, day=day, tzinfo=tz))
         for day in range(1, calendar.monthrange(year, month)[-1] + 1)
         if (day < from_date.day) or (day > to_date.day)
     ]
@@ -188,9 +196,9 @@ def test_count_symptom_free_days_ignores_entries_outside_period(dates_essentials
 
     output = count_symptom_free_days(entry_list, from_date, to_date, tz)
 
-    assert (
-        output == expected_days
-    ), "Symptom-free day counter function counts days beyond specified boundaries"
+    assert output == expected_days, (
+        "Symptom-free day counter function counts days beyond specified boundaries"
+    )
 
 
 def test_count_symptom_free_days_ignores_payload_count(dates_essentials):
@@ -217,16 +225,12 @@ def test_count_symptom_free_days_ignores_payload_count(dates_essentials):
     ]
     output_1 = count_symptom_free_days(entries_1, from_date, to_date, tz)
     output_2 = count_symptom_free_days(entries_2, from_date, to_date, tz)
-    assert (
-        output_1 == output_2
-    ), 'count_symptom_free_days does not ignore payload["count"]'
+    assert output_1 == output_2, 'count_symptom_free_days does not ignore payload["count"]'
 
 
 def test_count_symptom_free_days_requires_tz_in_entries(dates_essentials):
     year, month, tz = dates_essentials
-    entry_list = [
-        make_entry(EntryType.symptom, datetime(year=year, month=month, day=1))
-    ]
+    entry_list = [make_entry(EntryType.symptom, datetime(year=year, month=month, day=1))]
     from_date = date(year=year, month=month, day=1)
     to_date = date(year=year, month=month, day=2)
     with pytest.raises(ValueError) as exc_info:
@@ -246,9 +250,7 @@ def test_count_symptom_free_days_tz_shift_aware(dates_essentials):
     entry_list = [
         make_entry(
             EntryType.symptom,
-            datetime(
-                year=year, month=month, day=day, hour=hour, minute=minute, tzinfo=utc_tz
-            ),
+            datetime(year=year, month=month, day=day, hour=hour, minute=minute, tzinfo=utc_tz),
         )
     ]
     from_date = date(year=year, month=month, day=day + 1)
@@ -277,15 +279,11 @@ def test_count_symptom_free_days_ignores_nonsymptom_entries(dates_essentials):
     year, month, tz = dates_essentials
     from_date = date(year, month, 1)
     to_date = date(year, month, 2)
-    entries = [
-        make_entry(
-            EntryType.walk, datetime(year, month, from_date.day, hour=1, tzinfo=tz)
-        )
-    ]
+    entries = [make_entry(EntryType.walk, datetime(year, month, from_date.day, hour=1, tzinfo=tz))]
     expected_result = (to_date - from_date).days + 1
-    assert (
-        count_symptom_free_days(entries, from_date, to_date, tz) == expected_result
-    ), "count_symptom_free_days does not ignore non-symptom entries"
+    assert count_symptom_free_days(entries, from_date, to_date, tz) == expected_result, (
+        "count_symptom_free_days does not ignore non-symptom entries"
+    )
 
 
 def test_symptom_count_handles_empty_list(dates_essentials):
@@ -295,9 +293,7 @@ def test_symptom_count_handles_empty_list(dates_essentials):
     entry_list = []
 
     output = symptom_count(entry_list, from_date, to_date, "Europe/Moscow")
-    assert (
-        output == {}
-    ), f"Nonzero frequencies for empty entry list. Symptom frequencies: {output}"
+    assert output == {}, f"Nonzero frequencies for empty entry list. Symptom frequencies: {output}"
 
 
 def test_symptom_count_excludes_entries_outside_dates(entrylist_and_datetimes):
@@ -335,9 +331,9 @@ def test_symptom_count_ignores_zero_count(entrylist_and_datetimes):
     # expected_result = {"limping": 3.0 / num_days * 7, "skin": 1.0 / num_days * 7, "reflux": 1. / num_days * 7}
     expected_result = {}
     output = symptom_count(entries, from_date, to_date, tz)
-    assert (
-        output == expected_result
-    ), "symptom_frequency incorrectly handles symptoms with zero counts"
+    assert output == expected_result, (
+        "symptom_frequency incorrectly handles symptoms with zero counts"
+    )
 
 
 def test_symptom_count_only_symptoms_count(dates_essentials):
@@ -443,9 +439,9 @@ def test_symptom_count_only_symptoms_count(dates_essentials):
     # check if symptom is even taken into account
     assert the_only_symptom in output, "Symptom is ignored"
     # check if only symptom is accounted
-    assert (
-        len(output.keys()) == 1
-    ), "Multiple entries in symptom_count output dict with the only symptom"
+    assert len(output.keys()) == 1, (
+        "Multiple entries in symptom_count output dict with the only symptom"
+    )
     # check symptom count
     assert output == expected_results, "symptom_count counts non-symptom entries"
 
@@ -521,9 +517,7 @@ def test_symptom_count_handles_missing_category(dates_essentials):
         )
     ]
     output = symptom_count(entries, from_date, to_date, tz)
-    assert output == {
-        "other": 1
-    }, "symptom_count: missing category does not fall back to 'other'"
+    assert output == {"other": 1}, "symptom_count: missing category does not fall back to 'other'"
     return
 
 
@@ -546,9 +540,7 @@ def test_symptom_count_is_shift_aware(dates_essentials):
     ]
     expected_result = {"vomitting": 1}
     output = symptom_count(entries, from_date, to_date, tz)
-    assert (
-        output == expected_result
-    ), "symptom_count incorrectly handles timezone-related shifts"
+    assert output == expected_result, "symptom_count incorrectly handles timezone-related shifts"
 
 
 def test_symptom_count_handles_incorrect_daterange(dates_essentials):
@@ -598,9 +590,7 @@ def test_symptom_frequency_example(dates_essentials):
     ]
     expected_result = {"reflux": 2.0, "vomitting": 0.5}
     output = symptom_frequency(entries, from_date, to_date, tz)
-    assert (
-        output == expected_result
-    ), "symptom_frequency calculates frequencies incorrectly"
+    assert output == expected_result, "symptom_frequency calculates frequencies incorrectly"
 
 
 def test_symptom_frequency_handles_empty_list(dates_essentials):
@@ -610,9 +600,7 @@ def test_symptom_frequency_handles_empty_list(dates_essentials):
     entry_list = []
 
     output = symptom_frequency(entry_list, from_date, to_date, "Europe/Moscow")
-    assert (
-        output == {}
-    ), f"Nonzero frequencies for empty entry list. Symptom frequencies: {output}"
+    assert output == {}, f"Nonzero frequencies for empty entry list. Symptom frequencies: {output}"
 
 
 def test_symptom_frequency_excludes_entries_outside_dates(entrylist_and_datetimes):
@@ -652,9 +640,9 @@ def test_symptom_frequency_ignores_zero_count(entrylist_and_datetimes):
     # expected_result = {"limping": 3.0 / num_days * 7, "skin": 1.0 / num_days * 7, "reflux": 1. / num_days * 7}
     expected_result = {}
     output = symptom_frequency(entries, from_date, to_date, tz)
-    assert (
-        output == expected_result
-    ), "symptom_frequency incorrectly handles symptoms with zero counts"
+    assert output == expected_result, (
+        "symptom_frequency incorrectly handles symptoms with zero counts"
+    )
 
 
 def test_symptom_frequency_only_symptoms_count(dates_essentials):
@@ -759,9 +747,9 @@ def test_symptom_frequency_only_symptoms_count(dates_essentials):
     # check if symptom is even taken into account
     assert entries[0].payload["category"] in output, "Symptom is ignored"
     # check if only symptom is accounted
-    assert (
-        len(output.keys()) == 1
-    ), "Multiple entries in symptom_frequency output dict with the only symptom"
+    assert len(output.keys()) == 1, (
+        "Multiple entries in symptom_frequency output dict with the only symptom"
+    )
     # check symptom frequency
     assert output[entries[0].payload["category"]] == expected_results, "Incorrect"
 
@@ -817,9 +805,7 @@ def test_symptom_frequency_handles_missing_category(dates_essentials):
         )
     ]
     output = symptom_frequency(entries, from_date, to_date, tz)
-    assert output == {
-        "other": 1
-    }, "symptom_count: missing category does not fall back to 'other'"
+    assert output == {"other": 1}, "symptom_count: missing category does not fall back to 'other'"
     return
 
 
@@ -852,9 +838,9 @@ def test_symptom_frequency_ignores_zero_counts(dates_essentials):
             payload={"category": "hurt", "count": 0},
         )
     ]
-    assert (
-        symptom_frequency(entries, from_date, to_date, tz) == {}
-    ), "symptom_frequency does not ignore zero-count entries"
+    assert symptom_frequency(entries, from_date, to_date, tz) == {}, (
+        "symptom_frequency does not ignore zero-count entries"
+    )
 
 
 def test_symptom_frequency_handles_naive_datetimes(dates_essentials):
@@ -906,9 +892,7 @@ def test_symptom_frequency_tz_shift_aware(dates_essentials):
     expected_result = {"cough": 1}
     output = symptom_frequency(entries, from_date, to_date, tz)
 
-    assert (
-        expected_result == output
-    ), "symptom_frequency incorrectly handles timezone shift"
+    assert expected_result == output, "symptom_frequency incorrectly handles timezone shift"
 
 
 def test_symptom_frequency_uses_count(dates_essentials):
@@ -923,9 +907,9 @@ def test_symptom_frequency_uses_count(dates_essentials):
         )
     ]
     expected_result = {"cough": 5}
-    assert (
-        symptom_frequency(entries, from_date, to_date, tz) == expected_result
-    ), "symptom_frequency incorrectly uses symptom payload counts or does not use them"
+    assert symptom_frequency(entries, from_date, to_date, tz) == expected_result, (
+        "symptom_frequency incorrectly uses symptom payload counts or does not use them"
+    )
 
 
 def test_state_statitstics_ignores_entries_outside_period(dates_essentials):
@@ -956,7 +940,7 @@ def test_state_statitstics_ignores_entries_outside_period(dates_essentials):
             EntryType.feeding,
             datetime(year=year, month=month, day=3, tzinfo=tz),
             payload={
-                "food": "Royal Caning",
+                "food": "Royal Canin",
                 "amount": 100,
                 "unit": "g",
                 "appetite": 5,
@@ -966,7 +950,29 @@ def test_state_statitstics_ignores_entries_outside_period(dates_essentials):
     ]
 
 
-def test_count_symptom_free_days_handles_empty_entry_lists(dates_essentials):
+def test_count_state_statistics_handles_empty_entry_lists(empty_entry_list_fixture):
+    year, month, from_date, to_date, tz, entries = empty_entry_list_fixture
+    none_stats = {"mean": None, "std": None, "min": None, "max": None}
+    expected_result = {
+        "appetite": none_stats.copy(),
+        "energy": none_stats.copy(),
+        "mood": none_stats.copy(),
+        "sleep": none_stats.copy(),
+        "pain": none_stats.copy(),
+        "quality": none_stats.copy(),
+        "engagement": none_stats.copy(),
+    }
+    assert expected_result == count_state_statistics(entries, from_date, to_date, tz)
+
+
+def test_count_state_statistics_ignores_unused_entrytypes(empty_entry_list_fixture):
+    year, month, from_date, to_date, tz, entries = empty_entry_list_fixture
+    entries = [
+        make_entry(
+            EntryType.medication, datetime(year, month, from_date.day, 1, tzinfo=tz), payload={""}
+        )
+    ]
+
+
+def test_count_state_statistics_handles_empty_entry_lists(dates_essentials):
     year, month, tz = dates_essentials
-    from_date = date(year, month, 1)
-    to_date = date(year, month, 7)

@@ -241,3 +241,29 @@ def build_health_period_metrics(
         # TODO: implement score analyzer. codex have forgotten to plan it in CONTRACTS.md
     )
     return hpm
+
+def count_state_statistics(
+    entries: Sequence[Entry],
+    from_date: date,
+    to_date: date,
+    local_tz: timezone | ZoneInfo | str = "Europe/Moscow"
+) -> dict[str, list[float, float]]:
+"""
+
+
+    Returns:
+        dict{"appetite", "energy", "mood", "sleep", "pain", "quality", "engagement"}
+        with "mean", "min", "max", "std" keys
+count_per_state_statistics должно:
+0. Быть детерминированы
+1. Не выполнять I/O 
+2. Не изменять аргументы 
+3. Возвращать новые объекты 
+4. Не округлять внутренние вычисления без прямого указания на это.
+
+
+1. Column1. Игнорировать всё, что не является `EntryType.walk`, `EntryType.feeding`, `EntryType.wellbeing`, `EntryType.training`.
+2. Игнорить entries вне диапазона [from_date, to_date] (включительно).
+3. корректно обрабатывать несколько entries in a day.
+4. Не округлять статистики.
+5. Корректно обрабатывать datetimes с учетом часовых поясов (сделать один спорный datetime)"""

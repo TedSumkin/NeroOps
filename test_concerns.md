@@ -126,7 +126,7 @@ The started test is unfinished:
 
 Needed tests:
 
-- [ ] empty input;
+- [x] empty input;
 - [ ] only `EntryType.walk`, `EntryType.feeding`, `EntryType.wellbeing`, and
   `EntryType.training` are included;
 - [ ]  entries outside the inclusive period are ignored;
