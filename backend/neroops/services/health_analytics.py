@@ -1,9 +1,12 @@
+from copy import deepcopy
 from datetime import date, timezone, datetime
 from enum import Enum
 from zoneinfo import ZoneInfo
 from collections.abc import Iterable, Sequence
-from typing import Literal
+from typing import Literal, Union
 from sqlalchemy.orm import Mapped
+
+import numpy as np
 
 
 from neroops.models import Entry, EntryType
@@ -83,6 +86,12 @@ def _filter_entries_by_type(
     entries: Sequence[Entry], entry_type: EntryType
 ) -> Sequence[Entry]:
     return [entry for entry in entries if entry.type == entry_type]
+
+
+def _filter_entries_by_multiple_types(
+    entries: Sequence[Entry], entry_types: set[EntryType] | Sequence[EntryType]
+) -> list[Entry]:
+    return [entry for entry in entries if entry.type in entry_types]
 
 
 def symptom_count(
@@ -211,7 +220,82 @@ def count_state_statistics(
     from_date: date,
     to_date: date,
     local_tz: timezone | ZoneInfo | str = "Europe/Moscow",
-) -> dict[str, dict[str, float]]: ...
+) -> (
+    dict[str, dict[str, float | None]]
+    | dict[str, dict[str, None]]
+    | dict[str, dict[str, float]]
+):
+    # check if daterange is correct
+    if from_date > to_date:
+        raise ValueError(
+            f"The end of period occurs before the start, to_date={to_date}, from_date={from_date}"
+        )
+    observed_values = [
+        "appetite",
+        "energy",
+        "mood",
+        "sleep",
+        "pain",
+        "quality",
+        "engagement",
+    ]
+    # expected result for empty entry list
+    if ~len(entries):
+        none_stats = {"mean": None, "std": None, "min": None, "max": None}
+        none_result = {key: none_stats.copy() for key in observed_values}
+        return none_result
+
+    entrytype_to_key = {
+        EntryType.walk: ["energy", "quality"],
+        EntryType.feeding: ["appetite"],
+        EntryType.training: ["engagement"],
+        EntryType.wellbeing: ["mood", "sleep", "pain"],
+    }
+
+    calculated_stats = ["mean", "std", "min", "max"]
+    result = {
+        key: {stat_key: None for stat_key in calculated_stats}
+        for key in observed_values
+    }
+
+    # aggregate
+    aggregated_metrics = {key: [] for key in result}
+
+    if isinstance(local_tz, "str"):
+        local_tz = ZoneInfo(local_tz)
+
+    # check for naive naive datetimes
+    for entry in entries:
+        if entry.occurred_at.tzinfo is None:
+            raise ValueError("Timezone not specified in symptom datetime")
+
+    # filter entries
+    entries = _filter_entries_by_date(entries, from_date, to_date, local_tz=local_tz)
+    entrytype_set = set(
+        [EntryType.walk, EntryType.feeding, EntryType.training, EntryType.wellbeing]
+    )
+    entries = _filter_entries_by_multiple_types(entries, entrytype_set)
+
+    for entry in entries:
+        for key in entrytype_to_key[entry.type]:
+            aggregated_metrics[key].append(entry.payload[key])
+
+    for key in aggregated_metrics:
+        aggregated_metrics[key] = [
+            elem for elem in aggregated_metrics[key] if elem is not None
+        ]
+
+    # calculate via numpy
+    for key in result:
+        for stat_key in calculated_stats:
+            if not aggregated_metrics[key]:
+                result[key][stat_key] = None
+            else:
+                result[key][stat_key] = getattr(np, "nan" + stat_key)(
+                    aggregated_metrics[key]
+                ).item()
+
+    return result
 
 
 def build_health_period_metrics(
@@ -220,13 +304,15 @@ def build_health_period_metrics(
     to_date: date,
     local_tz: timezone | ZoneInfo | str = "Europe/Moscow",
 ) -> HealthPeriodMetrics:
-
     period_days = _period_days(from_date, to_date)
     symptom_free_days = count_symptom_free_days(entries, from_date, to_date, local_tz)
     symptom_counts = symptom_count(entries, from_date, to_date, local_tz)
     total_symptom_episodes = sum(val for val in symptom_counts.values())
 
-    average_scores = {}
+    average_scores = count_state_statistics(
+        entries, from_date, to_date, local_tz=local_tz
+    )
+    average_scores = {key: val["mean"] for key, val in average_scores.items()}
     hpm = HealthPeriodMetrics(
         from_date=from_date,
         to_date=to_date,
@@ -238,32 +324,5 @@ def build_health_period_metrics(
         symptom_episodes_per_7_days=total_symptom_episodes / 7,
         symptom_counts=symptom_counts,
         average_scores=average_scores,
-        # TODO: implement score analyzer. codex have forgotten to plan it in CONTRACTS.md
     )
     return hpm
-
-def count_state_statistics(
-    entries: Sequence[Entry],
-    from_date: date,
-    to_date: date,
-    local_tz: timezone | ZoneInfo | str = "Europe/Moscow"
-) -> dict[str, list[float, float]]:
-"""
-
-
-    Returns:
-        dict{"appetite", "energy", "mood", "sleep", "pain", "quality", "engagement"}
-        with "mean", "min", "max", "std" keys
-count_per_state_statistics должно:
-0. Быть детерминированы
-1. Не выполнять I/O 
-2. Не изменять аргументы 
-3. Возвращать новые объекты 
-4. Не округлять внутренние вычисления без прямого указания на это.
-
-
-1. Column1. Игнорировать всё, что не является `EntryType.walk`, `EntryType.feeding`, `EntryType.wellbeing`, `EntryType.training`.
-2. Игнорить entries вне диапазона [from_date, to_date] (включительно).
-3. корректно обрабатывать несколько entries in a day.
-4. Не округлять статистики.
-5. Корректно обрабатывать datetimes с учетом часовых поясов (сделать один спорный datetime)"""

@@ -233,4 +233,4 @@ class HealthPeriodMetrics(BaseModel):
     total_symptom_episodes: int = Field(ge=0)
     symptom_episodes_per_7_days: float = Field(ge=0)
     symptom_counts: dict[str, int]
-    average_scores: dict[str, float]
+    average_scores: dict[str, float] | dict[str, float | None] | dict[str, None]
